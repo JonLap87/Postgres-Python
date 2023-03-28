@@ -1,8 +1,7 @@
 import psycopg2
 
 conn = psycopg2.connect(database="netology_db", user="postgres", password="220261")
-def create_db(conn):
-    with conn.cursor() as cur:
+with conn.cursor() as cur:
     # удаление таблиц
         cur.execute("""
         DROP TABLE telefon;
@@ -27,22 +26,17 @@ def create_db(conn):
             """)
         conn.commit()  # фиксируем в БД
 
-def add_client(conn, name, lastname, email, number=None):
-    with conn.cursor() as cur:
         # наполнение таблиц (telefon,client)
         cur.execute("""
             INSERT INTO client(name,lastname,email) VALUES
             ('Tom', 'Adoms', 'adom@mail.ru') RETURNING id;
             """)
-        print(cur.fetchone())  # запрос данных автоматически зафиксирует изменения
         cur.execute("""
-            INSERT INTO client(name,lastname,email) VALUES
+             INSERT INTO client(name,lastname,email) VALUES
             ('Jon', 'Varon', 'samual@mail.com') RETURNING id;
             """)
-        print(cur.fetchone())  # запрос данных автоматически зафиксирует изменения
+        print(cur.fetchall())  # запрос данных автоматически зафиксирует изменения
 
-def add_telefon (conn, client_id, number):
-    with conn.cursor() as cur:
         cur.execute("""
             INSERT INTO telefon(number, client_id) VALUES
             (9109452204, 1) RETURNING id, number;
@@ -51,10 +45,8 @@ def add_telefon (conn, client_id, number):
             INSERT INTO telefon(number, client_id) VALUES
             (9101702023, 2) RETURNING id, number;
             """)
-        print(cur.fetchone())  # запрос данных автоматически зафиксирует изменения 
+        print(cur.fetchall())  # запрос данных автоматически зафиксирует изменения 
 
-def change_client(conn, client_id, name=None, last_name=None, email=None, number=None):
-    with conn.cursor() as cur:
         # обновление данных (client)
         cur.execute("""
             UPDATE client SET name=%s, lastname=%s,email=%s WHERE name=%s;
@@ -64,33 +56,38 @@ def change_client(conn, client_id, name=None, last_name=None, email=None, number
             """)
         print(cur.fetchall())  # запрос данных автоматически зафиксирует изменения
 
-def delete_telefon(conn, client_id, number):
-    with conn.cursor() as cur:
         # удаление данных (удаляем телефон сущ клиента)
-        cur.execute("""
+        def get_del_telefon(cursor, name: str) -> int:
+            cursor.execute("""
             DELETE FROM telefon WHERE client_id=%s;
             """, (1,))
-        cur.execute("""
+            cursor.execute("""
             SELECT * FROM telefon;
             """)
-        print(cur.fetchall())  # запрос данных автоматически зафиксирует изменения
+            return cur.fetchone()[1]
+        telefon = get_del_telefon(cur, 1)
+        print('telefon', telefon)
 
-def delete_client(conn, name):
-    with conn.cursor() as cur:
         # удаление данных (сущ клиента)
-        cur.execute("""
+        def get_del_client(cursor, name: str) -> int:
+            cursor.execute("""
             DELETE FROM client WHERE name=%s;
             """, ('Kal',))
-        cur.execute("""
+            cursor.execute("""
             SELECT * FROM client;
             """)
-        print(cur.fetchall())  # запрос данных автоматически зафиксирует изменения
-
-def find_client(conn, name=None, last_name=None, email=None, number=None):
-    with conn.cursor() as cur:
+            return cur.fetchone()[1]
+        name = get_del_client(cur, 'Jon')
+        print('client', name)
+    
         # выборка данных
-        cur.execute("""
+        def get_course_id(cursor, name: str) -> int:
+            cursor.execute("""
             SELECT id FROM client WHERE name=%s;
-            """, ('Jon',))  # хорошо, обратите внимание на кортеж
-        print(cur.fetchone())
+            """, (name,))
+            return cur.fetchone()[0]
+        id = get_course_id(cur, 'Jon')
+        print('jon_id', id)
+
+
 conn.close()
