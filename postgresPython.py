@@ -83,11 +83,20 @@ with conn.cursor() as cur:
         # выборка данных
         def get_course_id(cursor, name: str) -> int:
             cursor.execute("""
-            SELECT id FROM client WHERE name=%s;
+            SELECT c.name, c.lastname, c.email, t.number FROM client c
+            JOIN telefon t on t.client_id = c.id 
+            WHERE name=%s;
             """, (name,))
             return cur.fetchone()[0]
         id = get_course_id(cur, 'Jon')
-        print('jon_id', id)
+        print('jon_name', name)
+
+        cur.execute("""
+             SELECT c.name, c.lastname, c.email, t.number FROM client c
+             JOIN telefon t on t.client_id = c.id
+             WHERE lastname=%s;
+            """, ('Varon',))
+        print(cur.fetchall())  # запрос данных автоматически зафиксирует изменения 
 
 
 conn.close()
