@@ -1,102 +1,105 @@
 import psycopg2
 
-conn = psycopg2.connect(database="netology_db", user="postgres", password="220261")
-with conn.cursor() as cur:
-    # удаление таблиц
+
+def create_db(conn):
+    with conn.cursor() as cur:
         cur.execute("""
-        DROP TABLE telefon;
-        DROP TABLE client;
+        DROP TABLE IF EXISTS Phone;
+        DROP TABLE IF EXISTS Client;
         """)
 
-        # создание таблиц
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS client(
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(40) UNIQUE,
-            lastname VARCHAR(40) UNIQUE,
-            email VARCHAR(80) UNIQUE
-            );
-            """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS telefon(
-            id SERIAL PRIMARY KEY,
-            number BIGINT NOT NULL,
-            client_id INTEGER NOT NULL REFERENCES client(id)
-            );
-            """)
-        conn.commit()  # фиксируем в БД
-
-        # наполнение таблиц (telefon,client)
-        cur.execute("""
-            INSERT INTO client(name,lastname,email) VALUES
-            ('Tom', 'Adoms', 'adom@mail.ru') RETURNING id;
-            """)
-        cur.execute("""
-             INSERT INTO client(name,lastname,email) VALUES
-            ('Jon', 'Varon', 'samual@mail.com') RETURNING id;
-            """)
-        print(cur.fetchall())  # запрос данных автоматически зафиксирует изменения
+                CREATE TABLE IF NOT EXISTS Client(
+                client_id SERIAL PRIMARY KEY,
+                name VARCHAR(60) NOT NULL,
+                surname VARCHAR(60) NOT NULL,
+                e_mail VARCHAR(60) NOT NULL UNIQUE);
+                """)
 
         cur.execute("""
-            INSERT INTO telefon(number, client_id) VALUES
-            (9109452204, 1) RETURNING id, number;
-            """)
-        cur.execute("""
-            INSERT INTO telefon(number, client_id) VALUES
-            (9101702023, 2) RETURNING id, number;
-            """)
-        print(cur.fetchall())  # запрос данных автоматически зафиксирует изменения 
-
-        # обновление данных (client)
-        cur.execute("""
-            UPDATE client SET name=%s, lastname=%s,email=%s WHERE name=%s;
-            """, ('Kal', 'Rot', 'rot@mail.com', 'Tom'))
-        cur.execute("""
-            SELECT * FROM client;
-            """)
-        print(cur.fetchall())  # запрос данных автоматически зафиксирует изменения
-
-        # удаление данных (удаляем телефон сущ клиента)
-        def get_del_telefon(cursor, name: str) -> int:
-            cursor.execute("""
-            DELETE FROM telefon WHERE client_id=%s;
-            """, (1,))
-            cursor.execute("""
-            SELECT * FROM telefon;
-            """)
-            return cur.fetchone()[1]
-        telefon = get_del_telefon(cur, 1)
-        print('telefon', telefon)
-
-        # удаление данных (сущ клиента)
-        def get_del_client(cursor, name: str) -> int:
-            cursor.execute("""
-            DELETE FROM client WHERE name=%s;
-            """, ('Kal',))
-            cursor.execute("""
-            SELECT * FROM client;
-            """)
-            return cur.fetchone()[1]
-        name = get_del_client(cur, 'Jon')
-        print('client', name)
-    
-        # выборка данных
-        def get_course_id(cursor, name: str) -> int:
-            cursor.execute("""
-            SELECT c.name, c.lastname, c.email, t.number FROM client c
-            JOIN telefon t on t.client_id = c.id 
-            WHERE name=%s;
-            """, (name,))
-            return cur.fetchone()[0]
-        id = get_course_id(cur, 'Jon')
-        print('jon_name', name)
-
-        cur.execute("""
-             SELECT c.name, c.lastname, c.email, t.number FROM client c
-             JOIN telefon t on t.client_id = c.id
-             WHERE lastname=%s;
-            """, ('Varon',))
-        print(cur.fetchall())  # запрос данных автоматически зафиксирует изменения 
+                CREATE TABLE IF NOT EXISTS Phone(
+                number DECIMAL UNIQUE CHECK(number <= 99999999999),
+                client_id INTEGER REFERENCES Client(client_id));
+                """)
+        conn.commit()
 
 
-conn.close()
+def add_client(conn, name, surname, e_mail, phones=None):
+    conn.execute("""
+            INSERT INTO Client(name, surname, e_mail)
+            VALUES(%s, %s, %s)
+            RETURNING client_id, name, surname, e_mail;
+            """, (name, surname, e_mail))
+    return cur.fetchall()
+
+def add_phone (conn, client_id, number):
+	conn.execute("""
+			INSERT INTO Phone (client_id, number)
+			VALUES (%s,%s)
+			RETURNING client_id, number;
+			""", (client_id, number))
+	return cur.fetchall()
+
+def change_client(conn, client_id, name=None, surname=None, e_mail=None, number=None):
+    conn.execute("""
+            UPDATE Client
+            SET name=%s, surname=%s, e_mail=%s
+            WHERE client_id=%s
+            RETURNING client_id, name, surname, e_mail;
+            """, (name, surname, e_mail,client_id))
+    return cur.fetchall()
+
+def change_phone(conn, client_id, number):
+    conn.execute("""
+            UPDATE Phone
+            SET number=%s
+            WHERE client_id=%s
+            RETURNING client_id, number;
+            """, (number, client_id))
+    return cur.fetchall()
+
+def delete_phone(conn, client_id, number=None):
+    conn.execute("""
+            DELETE FROM Phone
+            WHERE client_id=%s
+            """, (client_id,))
+    conn.execute("""
+            SELECT * FROM Phone
+            """, (number, client_id))
+    return cur.fetchall()
+
+def delete_client(conn, client_id, name=None, surname=None, e_mail=None, number=None):
+    conn.execute("""
+            DELETE FROM Client
+            WHERE client_id=%s
+            """, (client_id,))
+    conn.execute("""
+            SELECT * FROM Client
+            """, (name, surname, e_mail,client_id))
+    return cur.fetchall()
+
+
+def find_client(conn, name=None, surname=None, e_mail=None, number=None):
+    conn.execute("""
+            SELECT c.name, c.surname, c.e_mail, p.number FROM Client AS c
+            LEFT JOIN Phone AS p ON c.client_id = p.client_id
+            WHERE c.name=%s OR c.surname=%s OR c.e_mail=%s OR p.number=%s;
+            """, (name, surname, e_mail, number))
+    return cur.fetchall()
+
+conn = psycopg2.connect(database="netol_db", user="postgres", password="220261")
+
+create_db(conn)
+with conn.cursor() as cur:
+    print (add_client(cur, 'Tom','Adoms', 'adom@mail.ru'))
+    print (add_client(cur, 'Jon', 'Varon', 'samual@mail.com'))
+    print (add_client(cur, 'JonI', 'Varonas', 'joni@mail.com'))
+    print (add_phone(cur, '1', '89109101314'))
+    print (add_phone(cur, '2', '89109101012'))
+    print (add_phone(cur, '3', '89109103322'))
+    print (change_client(cur, '1','Tomas','Adoms', 'adomsa@mail.ru' ))
+    print (change_phone(cur, '1', '89109101315'))
+    print (delete_phone(cur, '3'))
+    print (delete_client(cur, '3'))
+    print (find_client(cur, 'Jon'))
+    conn.commit()
